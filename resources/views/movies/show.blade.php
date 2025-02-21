@@ -5,7 +5,8 @@
     <h1 class="text-2xl font-bold mb-4">{{ $movie->title }}</h1>
 
     <div class="flex space-x-4">
-        <img src="{{ $movie->poster }}" alt="Poster" class="w-48 h-72 object-cover rounded-lg border">
+        <img src="{{ Storage::url($movie->poster) }}" alt="Poster" class="w-48 h-72 object-cover rounded-lg border">
+
         <div>
             <p class="text-gray-700"><span class="font-semibold">ID:</span> {{ $movie->id }}</p>
             <p class="text-gray-700"><span class="font-semibold">Thể loại:</span> {{ $movie->genre->name ?? 'Không xác định' }}</p>
