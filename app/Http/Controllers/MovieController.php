@@ -2,114 +2,148 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Gene;
 use App\Models\Movie;
-use App\Models\Genre;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage as FacadesStorage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
-
+use Illuminate\Support\Facades\Validator;
 
 class MovieController extends Controller
 {
-    // Danh sách phim
+    /**
+     * Display a listing of the resource.
+     */
     public function index()
     {
-        $movies = Movie::with('genre')->get();
-        return view('movies.index', compact('movies'));
+        $movies= DB::table('movies')
+            ->join('genes','movies.gene_id','=','genes.id')
+            ->select('movies.*','genes.name as gene')
+            ->where('movies.deleted_at',null)
+            ->orderBy('movies.id','desc')
+            ->paginate(10);
+
+        return view('movies.index',compact('movies'));
+
     }
 
-    // Hiển thị form thêm phim
+    /**
+     * Show the form for creating a new resource.
+     */
     public function create()
     {
-        $genres = Genre::all();
-        return view('movies.create', compact('genres'));
+        $genes = Gene::all();
+        return view('movies.add',compact('genes'));
+
     }
 
-    // Lưu phim vào database
+    /**
+     * Store a newly created resource in storage.
+     */
     public function store(Request $request)
     {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'poster' => 'required|image|mimes:jpg,jpeg,png,gif|max:2048',
-            'intro' => 'required',
-            'release_date' => 'required|date',
-            'genre_id' => 'required|exists:genres,id',
-        ]);
+        $param=$request->validate(
+            [
+                'title'=>'required|unique:movies,title',
+                'poster'=>'required|image|max:2048',
+                'intro'=>'required',
+                'release_date'=>'required|date|after_or_equal:today',
+                'gene_id'=>'required'
+            ],[
+                'title.required'=>'Không được bỏ trống',
+                'title.unique'=>'Đã tồn tại',
+                'poster.required'=>'Không được bỏ trống',
+                'poster.image'=>'Không phải ảnh',
+                'poster.max'=>'Hình ảnh không được vượt quá 2MB.',
+                'intro.required'=>'Không được bỏ trống',
+                'release_date.required'=>'Không được bỏ trống',
+                'release_date.after_or_equal'=>'Ngày không được nhỏ hơn ngày hiện tại.',
+                'gene_id.required'=>'Không được bỏ trống',
 
-    // Xử lý ảnh upload
-    if ($request->hasFile('poster')) {
-        $posterPath = $request->file('poster')->store('posters', 'public');
+            ]
+        );
+        $poster = "";
+
+        if ($request->hasFile('poster')) {
+            $poster = $request->file('poster')->store('images','public');
+        }
+        $param['poster']= $poster;
+        Movie::query()->create($param);
+        return redirect()->route('movie')->with('message', 'Thêm phim thành công!');
+
     }
 
-    // Lưu phim vào database
-    Movie::create([
-        'title' => $request->title,
-        'poster' => $posterPath ?? null,
-        'intro' => $request->intro, 
-        'release_date' => $request->release_date,
-        'genre_id' => $request->genre_id,
-    ]);
-
-
-    return redirect()->route('movies.index')->with('success', 'Phim đã được thêm thành công!');
-
-}
-
-
-    // Xem chi tiết phim
-    public function show(Movie $movie)
+    /**
+     * Display the specified resource.
+     */
+    public function show(String $id)
     {
-        return view('movies.show', compact('movie'));
+        $movie= Movie::find($id);
+
+        return view('movies.detail',compact('movie'));
     }
 
-    // Hiển thị form chỉnh sửa phim
-    public function edit(Movie $movie)
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit($id)
     {
-        $genres = Genre::all();
-        return view('movies.edit', compact('movie', 'genres'));
+        $movie= Movie::find($id);
+        $genes = Gene::all();
+        return view('movies.update',compact('movie','genes'));
     }
 
-    // Cập nhật phim
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, $id)
+    {
+        $movie = Movie::findOrFail($id);
+        $param = $request->validate(
+            [
+                'title' => 'required|unique:movies,title,' . $movie->id,
+                'poster' => 'nullable|image|max:2048',
+                'intro' => 'required',
+                'release_date' => 'required|date|after_or_equal:today',
+                'gene_id' => 'required'
+            ],
+            [
+                'title.required' => 'Không được bỏ trống',
+                'title.unique' => 'Đã tồn tại',
+                'poster.image' => 'Không phải ảnh',
+                'poster.max' => 'Hình ảnh không được vượt quá 2MB.',
+                'intro.required' => 'Không được bỏ trống',
+                'release_date.required' => 'Không được bỏ trống',
+                'release_date.after_or_equal' => 'Ngày không được nhỏ hơn ngày hiện tại.',
+                'gene_id.required' => 'Không được bỏ trống',
+            ]
+        );
 
-public function update(Request $request, Movie $movie)
-{
-    $request->validate([
-        'title' => 'required|string|max:255',
-        'poster' => 'image|mimes:jpg,jpeg,png|max:2048',
-        'intro' => 'required|string',
-        'release_date' => 'required|date',
-        'genre_id' => 'required|exists:genres,id',
-    ]);
-
-
-    // Cập nhật thông tin phim
-    $movie->title = $request->title;
-    $movie->intro = $request->intro;
-    $movie->release_date = $request->release_date;
-    $movie->genre_id = $request->genre_id;
-
-    // Xử lý file ảnh mới
-    if ($request->hasFile('poster')) {
-        // Xóa ảnh cũ nếu có
-        if ($movie->poster) {
-            Storage::delete('public/' . $movie->poster);
+        if ($request->hasFile('poster')) {
+            // Xóa poster cũ nếu có
+            if ($movie->poster) {
+                Storage::disk('public')->delete($movie->poster);
+            }
+            // Lưu poster mới
+            $param['poster'] = $request->file('poster')->store('images', 'public');
         }
 
-        // Lưu ảnh mới vào storage/app/public/posters
-        $path = $request->file('poster')->store('posters', 'public');
-        $movie->poster = $path;
+        $movie->update($param);
+        return redirect()->route('movie')->with('message', 'Cập nhật phim thành công!');
     }
 
-    $movie->save();
 
-    return redirect()->route('movies.index')->with('success', 'Cập nhật phim thành công!');
-}
-
-
-    // Xóa phim
-    public function destroy(Movie $movie)
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy($id)
     {
-        $movie->delete();
-        return redirect()->route('movies.index')->with('success', 'Xóa phim thành công!');
+        $movieDl=Movie::find($id)->delete();
+        if ($movieDl) {
+            Session::flash('success', 'Delete Successfully');
+            return redirect()->route('movie');
+        }
+
     }
 }

@@ -1,7 +1,8 @@
 <?php
 
-use App\Http\Controllers\GenreController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MovieController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,13 +16,20 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/movies', [MovieController::class, 'index'])->name('movies.index');
-Route::get('/movies/create', [MovieController::class, 'create'])->name('movies.create');
-Route::post('/movies', [MovieController::class, 'store'])->name('movies.store');
-Route::get('/movies/{movie}', [MovieController::class, 'show'])->name('movies.show');
-Route::get('/movies/{movie}/edit', [MovieController::class, 'edit'])->name('movies.edit');
-Route::put('/movies/{movie}', [MovieController::class, 'update'])->name('movies.update');
-Route::delete('/movies/{movie}', [MovieController::class, 'destroy'])->name('movies.destroy');
-Route::get('/movies/search', [MovieController::class, 'search'])->name('movies.search');
 
+Route::get('/',[MovieController::class,'index'])->name('movie');
+Route::get('/delete/{id}',[MovieController::class,'destroy'])->name('delete_movie');
+Route::get('/add', [MovieController::class, 'create'])->name('add_movie');
+Route::post('/add', [MovieController::class, 'store']);
+Route::get('/update/{id}', [MovieController::class, 'edit'])->name('edit_movie');
+Route::put('/update/{id}', [MovieController::class, 'update'])->name('update_movie');
+Route::match(['GET', 'POST'], '/register', [AuthController::class, 'register'])->name('register');
+Route::match(['GET', 'POST'], '/login', [AuthController::class, 'login'])->name('login');
+Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/profile', [AuthController::class, 'profile'])->name('profile')->middleware('auth');
+Route::match(['GET', 'POST'], '/update_profile', [AuthController::class, 'update_Profile'])->name('update_profile')->middleware('auth');
+Route::prefix('admin')->middleware('checkrole')->group(function () {
+    Route::get('/', [UserController::class, 'index'])->name('admin');
+    Route::post('/user/{id}', [UserController::class, 'active'])->name('active');
 
+});

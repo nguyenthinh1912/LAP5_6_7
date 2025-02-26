@@ -2,17 +2,22 @@
 
 namespace Database\Seeders;
 
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Models\Genre;
+use Illuminate\Support\Facades\DB;
 
-class GenreSeeder extends Seeder
+class GeneSeeder extends Seeder
 {
-    public function run()
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
     {
-        $genres = ['Hành động', 'Hài hước', 'Kinh dị', 'Viễn tưởng', 'Tình cảm'];
-
-        foreach ($genres as $genre) {
-            Genre::create(['name' => $genre]);
-        }
+        DB::table('genes')->insert([
+            ['name' => 'Cartoon'],
+            ['name' => 'News'],
+            ['name' => 'Comedy'],
+            ['name' => 'Science fiction']
+        ]);
     }
 }
